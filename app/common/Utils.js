@@ -1,4 +1,3 @@
-
 const getWeb3Instance = require('./getWeb3Instance');
 
 

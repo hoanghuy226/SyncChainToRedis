@@ -36,12 +36,6 @@ var app = {
   }
 }
 
-// module.exports = {
-//   start: function(callback){
-//     start(callback);
-//   }
-// }
-
 class SyncChainToRedis {
 
   loadConfig(){
