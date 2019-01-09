@@ -1,69 +1,43 @@
 // const Web3                        = require('web3');
+require('dotenv').config();
 const _                           = require('lodash');
 const async                       = require('async');
-const config                      = require('../../config/config.json');
-const logger                      = require('sota-core').getLogger('SyncChainToRedis');
 const Utils                       = require('../common/Utils');
 const redis                       = require('redis');
+
+const bnbABI                      = require('../../config/abi/bnb');
+const network                     = require('../../config/network');
+
+const web3                        = Utils.getWeb3Instance();
 const client                      = redis.createClient();
+const bnbContract                 = new web3.eth.Contract(bnbABI, network.contractAddresses.bnb);
 
-const defaultConfig = config.default;
-// const environment = process.env.NODE_ENV || 'development';
-const environment = process.env.NODE_ENV || 'mainnet';
-const environmentConfig = config[environment];
-const finalConfig = _.merge(defaultConfig, environmentConfig);
 
-let LATEST_PROCESSED_BLOCK = 0;
-const BATCH_BLOCK_SIZE = parseInt(process.env.BATCH_BLOCK_SIZE || 500);
+let LATEST_PROCESSED_BLOCK  = 0;
+const BATCH_BLOCK_SIZE      = parseInt(process.env.BATCH_BLOCK_SIZE || 500);
 const REQUIRED_CONFIRMATION = parseInt(process.env.REQUIRED_CONFIRMATION || 7);
 const PARALLEL_INSERT_LIMIT = 10;
 
-const web3 = Utils.getWeb3Instance();
+// const env  = process.env;
 
-// var web3;
-var myContract;
-var myContract2;
 var countLogs, start, millis,start0, millis0,start1, millis1,start2, millis2;
-var app = {
-  instances: {},
-  templates: {},
-  data: {
-      shouts: {},
-  },
-  cache: {
-      blockTime: {},
-      usernames: {}
-  }
-}
+
 
 class SyncChainToRedis {
 
-  loadConfig(){
-    global.gConfig = finalConfig;
-    // console.log(global.gConfig);
-  }
-
-  init() {
-    this.loadConfig();
+  redisconnect() {
     //Handle event redis
     client.on('connect', function() {
       console.log('Redis client connected');
-      
     });
     client.on('error', function(err){
       console.log('Something went wrong ', err)
     });
-    // console.log(global.gConfig.RPCURL);
-    // let web3Provider = new Web3.providers.WebsocketProvider(global.gConfig.RPCURL);
-    // web3 = new Web3(web3Provider);
-    console.log("Web3 version",web3.version);
-    // Connect to contract(bnb)
-    myContract = new web3.eth.Contract(global.gConfig.ABI, global.gConfig.ADDRESS);
-    this.start ();
-    //callback(null,"Doing..");
   }
 
   start () {
+    console.log("Web3 version",web3.version);
+    this.redisconnect();
     async.auto({
       latestProcessedBlock: (next) => {
         if (LATEST_PROCESSED_BLOCK > 0) {
@@ -78,13 +52,10 @@ class SyncChainToRedis {
     }, (err, ret) => {
       let timer = 5000; //networkConfig.averageBlockTime;
       if (err) {
-        // logger.error(err);
-        // logger.info(`Crawler will be restarted in 5 seconds...`);
         console.log(err);
         timer = 5000;
       } else {
         console.log(`Already processed the newest block. Crawler will be restarted in 1 block...`);
-        // logger.info(`Already processed the newest block. Crawler will be restarted in 1 block...`);
       }
       setTimeout(() => {
         this.start();
@@ -147,12 +118,11 @@ class SyncChainToRedis {
 
   //
   _processBlocksOnce (fromBlockNumber, toBlockNumber, callback) {
-      // logger.info(`_processBlocksOnce: ${fromBlockNumber} → ${toBlockNumber}`);
     console.log(`_processBlocksOnce: ${fromBlockNumber} → ${toBlockNumber}`);
     async.auto({
       logs: (next) => {
         start0 = Date.now();
-        myContract.getPastEvents("Transfer", {
+        bnbContract.getPastEvents("Transfer", {
           //filter: {myIndexedParam: [20,23], myOtherIndexedParam: '0x123456789...'}, // Using an array means OR: e.g. 20 or 23
           fromBlock: fromBlockNumber,
           toBlock: toBlockNumber
@@ -178,7 +148,7 @@ class SyncChainToRedis {
           // console.log(blockNumber);
           this.getBlockTimestamp(blockNumber, (_err, timestamp) => {
             if (_err) {
-              logger.error(_err);
+              console.log(_err);
             }
 
             blockTimestamps[blockNumber] = timestamp;
@@ -206,7 +176,7 @@ class SyncChainToRedis {
       return callback(err);
     }
 
-    logger.trace(`Requeried! Block ${blockNumber} time: ${block.timestamp}`);
+    // logger.trace(`Requeried! Block ${blockNumber} time: ${block.timestamp}`);
       return callback(null, block.timestamp);
     });
   }

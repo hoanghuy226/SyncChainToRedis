@@ -14,7 +14,7 @@ app.use('/', express.static('public'));
 
 app.get('/start', (req, res) => {
   console.log("**start job**");
-  syncjob.init(function (answer) {
+  syncjob.start(function (answer) {
     res.send(answer);
   })
 });
